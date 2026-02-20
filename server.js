@@ -11,10 +11,23 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
+app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Debug route to check if environment variables are set (Safe version)
+app.get('/debug-env', (req, res) => {
+    res.json({
+        DB_HOST_SET: !!process.env.DB_HOST,
+        DB_USER_SET: !!process.env.DB_USER,
+        DB_PASS_SET: !!process.env.DB_PASSWORD,
+        DB_NAME_SET: !!process.env.DB_NAME,
+        JWT_SECRET_SET: !!process.env.JWT_SECRET,
+        NODE_ENV: process.env.NODE_ENV
+    });
+});
 
 // JWT Verification Middleware
 const verifyToken = async (req, res, next) => {
