@@ -1,26 +1,39 @@
 const mysql = require('mysql2/promise');
 require('dotenv').config();
 
+const requiredEnv = ['DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME', 'DB_PORT'];
+const missingEnv = requiredEnv.filter(env => !process.env[env]);
+
+if (missingEnv.length > 0 && process.env.NODE_ENV === 'production') {
+    console.error('CRITICAL ERROR: Missing environment variables:', missingEnv.join(', '));
+}
+
 const pool = mysql.createPool({
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
-    port: process.env.DB_PORT,
+    port: process.env.DB_PORT || 17177,
     ssl: {
-        rejectUnauthorized: false // Required for Aiven if no CA cert provided, or use true if system has CA
+        rejectUnauthorized: false
     },
     waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
+    connectionLimit: 5, // Reduced for serverless environment
+    queueLimit: 0,
+    connectTimeout: 10000 // 10 seconds timeout
 });
 
 async function initDB() {
+    // Skip init if environment variables are missing to avoid crash
+    if (missingEnv.length > 0) {
+        console.warn('Skipping DB Init: Missing environment variables');
+        return;
+    }
+
     try {
         const connection = await pool.getConnection();
         console.log('Connected to Aiven MySQL Database');
 
-        // Create kodusers table
         await connection.query(`
             CREATE TABLE IF NOT EXISTS kodusers (
                 uid VARCHAR(255) PRIMARY KEY,
@@ -32,9 +45,7 @@ async function initDB() {
                 balance DECIMAL(15, 2) DEFAULT 100000.00
             )
         `);
-        console.log('Table kodusers created or already exists');
 
-        // Create CJWIT table
         await connection.query(`
             CREATE TABLE IF NOT EXISTS CJWIT (
                 tid INT AUTO_INCREMENT PRIMARY KEY,
@@ -44,11 +55,11 @@ async function initDB() {
                 FOREIGN KEY (uid) REFERENCES kodusers(uid) ON DELETE CASCADE
             )
         `);
-        console.log('Table CJWIT created or already exists');
 
         connection.release();
     } catch (error) {
-        console.error('Error initializing database:', error);
+        console.error('Database Initialization Error:', error.message);
+        // Don't throw the error, just log it so the server can still start (to show a friendly 500 error later if needed)
     }
 }
 
