@@ -1,19 +1,20 @@
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
+const path = require('path');
 const { initDB } = require('./db');
 const authController = require('./controllers/authController');
 const userController = require('./controllers/userController');
 const jwt = require('jsonwebtoken');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // JWT Verification Middleware
 const verifyToken = async (req, res, next) => {
@@ -54,13 +55,18 @@ app.post('/register', authController.register);
 app.post('/login', authController.login);
 app.get('/balance', verifyToken, userController.getBalance);
 
-// Start server
-// Start server
+// Explicit route for root to avoid "Cannot GET /"
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Initialize database
+initDB().catch(err => console.error('DB Init Error:', err));
+
+// Start server locally
 if (require.main === module) {
-    initDB().then(() => {
-        app.listen(PORT, () => {
-            console.log(`Server running on http://localhost:${PORT}`);
-        });
+    app.listen(PORT, () => {
+        console.log(`Server running on http://localhost:${PORT}`);
     });
 }
 
